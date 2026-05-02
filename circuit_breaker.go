@@ -1,7 +1,6 @@
 package circuitbreaker
 
 import (
-	"fmt"
 	"log"
 	"time"
 )
