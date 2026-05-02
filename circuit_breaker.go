@@ -1,6 +1,9 @@
 package circuitbreaker
 
-import "time"
+import (
+	"log"
+	"time"
+)
 
 type CircuitBreakerState int
 
@@ -20,12 +23,13 @@ type CircuiBreaker interface {
 
 // TODO: implement mutex
 type circuitBreaker struct {
-	state        CircuitBreakerState
-	failCount    int
-	successCount int
-	threshold    int
-	now          func() time.Time
-	timeout      time.Duration
+	state         CircuitBreakerState
+	failCount     int
+	successCount  int
+	threshold     int
+	probeInFlight bool
+	now           func() time.Time
+	timeout       time.Duration
 }
 
 func NewCircuitBreaker(threshold int, now func() time.Time) CircuiBreaker {
@@ -53,16 +57,24 @@ func (cb *circuitBreaker) SetCurrentState(state CircuitBreakerState) {
 
 func (cb *circuitBreaker) Allow() bool {
 	switch cb.CurrentState() {
+	case Closed:
+		return true
 	case Open:
 		if time.Since(cb.now()) < cb.timeout {
 			return false
 		}
-
 		cb.SetCurrentState(HalfOpen)
 		return true
-	case Closed, HalfOpen:
+	case HalfOpen:
+		if cb.probeInFlight {
+			return false
+		}
+
+		// allow only 1 probeInFlight
+		cb.probeInFlight = true
 		return true
 	default:
+		log.Printf("unknown circuit breaker state: %v", cb.CurrentState())
 		return true
 	}
 }
