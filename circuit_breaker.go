@@ -49,6 +49,12 @@ func (cb *circuitBreaker) RecordFailure() {
 
 func (cb *circuitBreaker) RecordSuccess() {
 	cb.successCount++
+
+	// if there's 1 request success while HalfOpen, set state to Closed
+	if cb.CurrentState() == HalfOpen {
+		cb.SetCurrentState(Closed)
+		cb.probeInFlight = false
+	}
 }
 
 func (cb *circuitBreaker) SetCurrentState(state CircuitBreakerState) {
