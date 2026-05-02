@@ -1,6 +1,7 @@
 package circuitbreaker
 
 import (
+	"fmt"
 	"log"
 	"time"
 )
@@ -30,6 +31,7 @@ type circuitBreaker struct {
 	probeInFlight bool
 	now           func() time.Time
 	timeout       time.Duration
+	openedAt      time.Time
 }
 
 func NewCircuitBreaker(threshold int, now func() time.Time) CircuiBreaker {
@@ -58,6 +60,9 @@ func (cb *circuitBreaker) RecordSuccess() {
 }
 
 func (cb *circuitBreaker) SetCurrentState(state CircuitBreakerState) {
+	if cb.state == Open {
+		cb.openedAt = cb.now()
+	}
 	cb.state = state
 }
 
@@ -66,7 +71,7 @@ func (cb *circuitBreaker) Allow() bool {
 	case Closed:
 		return true
 	case Open:
-		if time.Since(cb.now()) < cb.timeout {
+		if cb.now().Sub(cb.openedAt) < cb.timeout {
 			return false
 		}
 		cb.SetCurrentState(HalfOpen)
