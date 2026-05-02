@@ -11,10 +11,11 @@ const (
 type CircuiBreaker interface {
 	Execute() error
 	CurrentState() CircuitBreakerState
-	RecordFailure() error
-	RecordSuccess() error
+	RecordFailure()
+	RecordSuccess()
 }
 
+// TODO: implement mutex
 type circuitBreaker struct {
 	state        CircuitBreakerState
 	failCount    int
@@ -30,6 +31,10 @@ func (cb *circuitBreaker) Execute() error { return nil }
 
 func (cb *circuitBreaker) CurrentState() CircuitBreakerState { return Closed }
 
-func (cb *circuitBreaker) RecordFailure() error { return nil }
+func (cb *circuitBreaker) RecordFailure() {
+	cb.failCount++
+}
 
-func (cb *circuitBreaker) RecordSuccess() error { return nil }
+func (cb *circuitBreaker) RecordSuccess() {
+	cb.successCount++
+}
