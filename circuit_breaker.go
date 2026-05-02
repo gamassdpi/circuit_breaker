@@ -24,12 +24,14 @@ type circuitBreaker struct {
 }
 
 func NewCircuitBreaker(threshold int) CircuiBreaker {
-	return &circuitBreaker{threshold: threshold}
+	return &circuitBreaker{threshold: threshold, state: Closed}
 }
 
 func (cb *circuitBreaker) Execute() error { return nil }
 
-func (cb *circuitBreaker) CurrentState() CircuitBreakerState { return Closed }
+func (cb *circuitBreaker) CurrentState() CircuitBreakerState {
+	return cb.state
+}
 
 func (cb *circuitBreaker) RecordFailure() {
 	cb.failCount++
