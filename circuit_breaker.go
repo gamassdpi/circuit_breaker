@@ -28,13 +28,13 @@ type circuitBreaker struct {
 	successCount     int
 	failureThreshold int
 	probeInFlight    bool
-	now              func() time.Time
 	cooldownPeriod   time.Duration
+	now              func() time.Time
 	openedAt         time.Time
 }
 
-func NewCircuitBreaker(failureThreshold int, now func() time.Time) CircuiBreaker {
-	return &circuitBreaker{state: Closed, failureThreshold: failureThreshold, now: now}
+func NewCircuitBreaker(failureThreshold int, cooldownPeriod time.Duration, now func() time.Time) CircuiBreaker {
+	return &circuitBreaker{failureThreshold: failureThreshold, cooldownPeriod: cooldownPeriod, now: now}
 }
 
 // TODO: implemement mutex for any shared state access (state, fail and success count, etc)
