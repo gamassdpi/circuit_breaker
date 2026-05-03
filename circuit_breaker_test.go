@@ -74,9 +74,31 @@ func TestAllow(t *testing.T) {
 		assert.Equal(t, true, cb.Allow())
 		assert.Equal(t, HalfOpen, cb.CurrentState())
 	})
+
+	t.Run("when half open and probeInFlight false - return true", func(t *testing.T) {
+		cb, clock := newTestCB(t)
+		triggerOpen(cb)
+		clock.now = clock.now.Add(cooldownPeriod).Add(1 * time.Second)
+		// trigger state transition from Open to HalfOpen with probeInFlight is false
+		cb.Allow()
+		
+		assert.Equal(t, true, cb.Allow())
+	})
+
+	t.Run("when half open and probeInFlight true - return false", func(t *testing.T) {
+		cb, clock := newTestCB(t)
+		triggerOpen(cb)
+		clock.now = clock.now.Add(cooldownPeriod).Add(1 * time.Second)
+		// trigger state transition from Open to HalfOpen with probeInFlight is false
+		cb.Allow()
+		// trigger probeInFlight to true
+		cb.Allow()
+
+		assert.Equal(t, false, cb.Allow())
+	})
 }
 
-func TestRecordAllow(t *testing.T) {
+func TestRecordFailure(t *testing.T) {
 	t.Run("when closed and failureCount below threshold - state stays closed", func(t *testing.T){
 		cb, _ := newTestCB(t)
 		
