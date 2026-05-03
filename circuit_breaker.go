@@ -13,18 +13,8 @@ const (
 	HalfOpen
 )
 
-type CircuitBreaker interface {
-	Execute() error
-	CurrentState() CircuitBreakerState
-	RecordFailure()
-	Allow() bool
-
-	GetFailureCount() int
-	IsProbeInFlight() bool
-}
-
 // TODO: implement mutex
-type circuitBreaker struct {
+type CircuitBreaker struct {
 	state            CircuitBreakerState
 	failureCount     int
 	failureThreshold int
@@ -34,18 +24,18 @@ type circuitBreaker struct {
 	openedAt         time.Time
 }
 
-func NewCircuitBreaker(failureThreshold int, cooldownPeriod time.Duration, now func() time.Time) CircuitBreaker {
-	return &circuitBreaker{failureThreshold: failureThreshold, cooldownPeriod: cooldownPeriod, now: now}
+func NewCircuitBreaker(failureThreshold int, cooldownPeriod time.Duration, now func() time.Time) *CircuitBreaker {
+	return &CircuitBreaker{failureThreshold: failureThreshold, cooldownPeriod: cooldownPeriod, now: now}
 }
 
 // TODO: implemement mutex for any shared state access (state, fail and success count, etc)
-func (cb *circuitBreaker) Execute() error { return nil }
+func (cb *CircuitBreaker) Execute() error { return nil }
 
-func (cb *circuitBreaker) CurrentState() CircuitBreakerState {
+func (cb *CircuitBreaker) CurrentState() CircuitBreakerState {
 	return cb.state
 }
 
-func (cb *circuitBreaker) RecordFailure() {
+func (cb *CircuitBreaker) RecordFailure() {
 	switch cb.state {
 	case Closed:
 		cb.failureCount++
@@ -60,7 +50,7 @@ func (cb *circuitBreaker) RecordFailure() {
 	}
 }
 
-func (cb *circuitBreaker) Allow() bool {
+func (cb *CircuitBreaker) Allow() bool {
 	switch cb.state {
 	case Closed:
 		return true
@@ -85,10 +75,10 @@ func (cb *circuitBreaker) Allow() bool {
 	}
 }
 
-func (cb *circuitBreaker) GetFailureCount() int {
+func (cb *CircuitBreaker) GetFailureCount() int {
 	return cb.failureCount
 }
 
-func (cb *circuitBreaker) IsProbeInFlight() bool {
+func (cb *CircuitBreaker) IsProbeInFlight() bool {
 	return cb.probeInFlight
 }

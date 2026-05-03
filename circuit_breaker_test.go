@@ -20,7 +20,7 @@ const (
 	cooldownPeriod   time.Duration = 30 * time.Second
 )
 
-func newTestCB(t *testing.T) (CircuitBreaker, *testClock) {
+func newTestCB(t *testing.T) (*CircuitBreaker, *testClock) {
 	t.Helper()
 	clock := &testClock{now: time.Now()} // freeze time
 
@@ -28,7 +28,7 @@ func newTestCB(t *testing.T) (CircuitBreaker, *testClock) {
 	return cb, clock
 }
 
-func triggerOpen(cb CircuitBreaker) {
+func triggerOpen(cb *CircuitBreaker) {
 	for range failureThreshold {
 		cb.RecordFailure()
 	}
