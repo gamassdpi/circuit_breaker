@@ -10,10 +10,10 @@ import (
 func TestAllow_ShouldReturnFalse_WhenOpen_AndTimeoutNotExpired(t *testing.T) {
 	baseTime := time.Now()
 	cb := &circuitBreaker{
-		now: func() time.Time { return baseTime },
-		state: Open,
-		openedAt: baseTime,
-		timeout: 30 * time.Second,
+		now:            func() time.Time { return baseTime },
+		state:          Open,
+		openedAt:       baseTime,
+		cooldownPeriod: 30 * time.Second,
 	}
 
 	baseTime = baseTime.Add(29 * time.Second)

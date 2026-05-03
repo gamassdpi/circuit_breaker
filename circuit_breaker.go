@@ -23,18 +23,18 @@ type CircuiBreaker interface {
 
 // TODO: implement mutex
 type circuitBreaker struct {
-	state         CircuitBreakerState
-	failCount     int
-	successCount  int
-	threshold     int
-	probeInFlight bool
-	now           func() time.Time
-	timeout       time.Duration
-	openedAt      time.Time
+	state            CircuitBreakerState
+	failureCount     int
+	successCount     int
+	failureThreshold int
+	probeInFlight    bool
+	now              func() time.Time
+	cooldownPeriod   time.Duration
+	openedAt         time.Time
 }
 
-func NewCircuitBreaker(threshold int, now func() time.Time) CircuiBreaker {
-	return &circuitBreaker{state: Closed, threshold: threshold, now: now}
+func NewCircuitBreaker(failureThreshold int, now func() time.Time) CircuiBreaker {
+	return &circuitBreaker{state: Closed, failureThreshold: failureThreshold, now: now}
 }
 
 // TODO: implemement mutex for any shared state access (state, fail and success count, etc)
@@ -45,7 +45,7 @@ func (cb *circuitBreaker) CurrentState() CircuitBreakerState {
 }
 
 func (cb *circuitBreaker) RecordFailure() {
-	cb.failCount++
+	cb.failureCount++
 }
 
 func (cb *circuitBreaker) RecordSuccess() {
@@ -70,7 +70,7 @@ func (cb *circuitBreaker) Allow() bool {
 	case Closed:
 		return true
 	case Open:
-		if cb.now().Sub(cb.openedAt) < cb.timeout {
+		if cb.now().Sub(cb.openedAt) < cb.cooldownPeriod {
 			return false
 		}
 		cb.SetCurrentState(HalfOpen)
