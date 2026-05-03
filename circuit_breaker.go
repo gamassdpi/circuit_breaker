@@ -19,6 +19,9 @@ type CircuiBreaker interface {
 	RecordFailure()
 	RecordSuccess()
 	Allow() bool
+
+	GetFailureCount() int
+	IsProbeInFlight() bool
 }
 
 // TODO: implement mutex
@@ -87,4 +90,12 @@ func (cb *circuitBreaker) Allow() bool {
 		log.Printf("unknown circuit breaker state: %v", cb.CurrentState())
 		return true
 	}
+}
+
+func (cb *circuitBreaker) GetFailureCount() int {
+	return cb.failureCount
+}
+
+func (cb *circuitBreaker) IsProbeInFlight() bool {
+	return cb.probeInFlight
 }
