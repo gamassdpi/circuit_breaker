@@ -1,6 +1,7 @@
 package circuitbreaker
 
 import (
+	"errors"
 	"log"
 	"time"
 )
@@ -12,6 +13,8 @@ const (
 	Open
 	HalfOpen
 )
+
+var ErrCircuitOpen = errors.New("circuit breaker is open")
 
 // TODO: implement mutex
 type CircuitBreaker struct {
@@ -29,7 +32,18 @@ func NewCircuitBreaker(failureThreshold int, cooldownPeriod time.Duration, now f
 }
 
 // TODO: implemement mutex for any shared state access (state, fail and success count, etc)
-func (cb *CircuitBreaker) Execute() error { return nil }
+func (cb *CircuitBreaker) Execute(fn func() error) error {
+	if !cb.Allow() {
+		return ErrCircuitOpen
+	}
+
+	err := fn()
+	if err != nil {
+		cb.RecordFailure()
+	}
+
+	return err
+}
 
 func (cb *CircuitBreaker) CurrentState() CircuitBreakerState {
 	return cb.state
