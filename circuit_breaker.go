@@ -25,7 +25,6 @@ type CircuiBreaker interface {
 type circuitBreaker struct {
 	state            CircuitBreakerState
 	failureCount     int
-	successCount     int
 	failureThreshold int
 	probeInFlight    bool
 	cooldownPeriod   time.Duration
@@ -46,22 +45,23 @@ func (cb *circuitBreaker) CurrentState() CircuitBreakerState {
 
 func (cb *circuitBreaker) RecordFailure() {
 	cb.failureCount++
+
+	if cb.CurrentState() == HalfOpen && cb.probeInFlight {
+		cb.SetCurrentState(Open)
+		cb.openedAt = cb.now()
+	}
 }
 
 func (cb *circuitBreaker) RecordSuccess() {
-	cb.successCount++
-
-	// if there's 1 request success while HalfOpen, set state to Closed
+	// if there's 1 request success while HalfOpen, set state to Closed and failureCount to 0
 	if cb.CurrentState() == HalfOpen {
 		cb.SetCurrentState(Closed)
 		cb.probeInFlight = false
+		cb.failureCount = 0
 	}
 }
 
 func (cb *circuitBreaker) SetCurrentState(state CircuitBreakerState) {
-	if cb.state == Open {
-		cb.openedAt = cb.now()
-	}
 	cb.state = state
 }
 
