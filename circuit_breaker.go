@@ -13,11 +13,10 @@ const (
 	HalfOpen
 )
 
-type CircuiBreaker interface {
+type CircuitBreaker interface {
 	Execute() error
 	CurrentState() CircuitBreakerState
 	RecordFailure()
-	RecordSuccess()
 	Allow() bool
 
 	GetFailureCount() int
@@ -35,7 +34,7 @@ type circuitBreaker struct {
 	openedAt         time.Time
 }
 
-func NewCircuitBreaker(failureThreshold int, cooldownPeriod time.Duration, now func() time.Time) CircuiBreaker {
+func NewCircuitBreaker(failureThreshold int, cooldownPeriod time.Duration, now func() time.Time) CircuitBreaker {
 	return &circuitBreaker{failureThreshold: failureThreshold, cooldownPeriod: cooldownPeriod, now: now}
 }
 
@@ -58,15 +57,6 @@ func (cb *circuitBreaker) RecordFailure() {
 		cb.state = Open
 		cb.openedAt = cb.now()
 		cb.probeInFlight = false
-	}
-}
-
-func (cb *circuitBreaker) RecordSuccess() {
-	// if there's 1 request success while HalfOpen, set state to Closed and failureCount to 0
-	if cb.state == HalfOpen {
-		cb.state = Closed
-		cb.probeInFlight = false
-		cb.failureCount = 0
 	}
 }
 
