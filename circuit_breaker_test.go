@@ -1,109 +1,96 @@
 package circuitbreaker
 
 import (
-	// "fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCircuitBreaker_InitialState(t *testing.T) {
-	failureThreshold := 3
-	cooldownPeriod := 30 * time.Second
-	baseTime := time.Now()
-
-	cb := NewCircuitBreaker(failureThreshold, cooldownPeriod, func() time.Time { return baseTime })
-
-	assert.Equal(t, Closed, cb.CurrentState())
-	assert.Equal(t, 0, cb.GetFailureCount())
-	assert.Equal(t, false, cb.IsProbeInFlight())
+type testClock struct {
+	now time.Time
 }
 
-func TestAllow_WhenClosed_ReturnsTrue(t *testing.T) {
-	failureThreshold := 3
-	cooldownPeriod := 30 * time.Second
-	baseTime := time.Now()
-
-	cb := NewCircuitBreaker(failureThreshold, cooldownPeriod, func() time.Time { return baseTime })
-
-	assert.Equal(t, true, cb.Allow())
+func (c *testClock) Now() time.Time {
+	return c.now
 }
 
-func TestRecordFailure_BelowThreshold_StaysClosed(t *testing.T) {
-	failureThreshold := 3
-	cooldownPeriod := 30 * time.Second
-	baseTime := time.Now()
+const (
+	failureThreshold int           = 3
+	cooldownPeriod   time.Duration = 30 * time.Second
+)
 
-	cb := NewCircuitBreaker(failureThreshold, cooldownPeriod, func() time.Time { return baseTime })
+func newTestCB(t *testing.T) (CircuitBreaker, *testClock) {
+	t.Helper()
+	clock := &testClock{now: time.Now()} // freeze time
 
-	cb.RecordFailure()
-	cb.RecordFailure()
-
-	assert.Equal(t, 2, cb.GetFailureCount())
-	assert.Equal(t, Closed, cb.CurrentState())
+	cb := NewCircuitBreaker(failureThreshold, cooldownPeriod, clock.Now)
+	return cb, clock
 }
 
-func TestRecordFailure_ReachesTreshold_TransitionsToOpen(t *testing.T) {
-	failureThreshold := 3
-	cooldownPeriod := 30 * time.Second
-	baseTime := time.Now()
-
-	cb := NewCircuitBreaker(failureThreshold, cooldownPeriod, func() time.Time { return baseTime })
-
-	cb.RecordFailure()
-	cb.RecordFailure()
-	cb.RecordFailure()
-
-	assert.Equal(t, Open, cb.CurrentState())
-}
-
-func TestAllow_WhenOpen_BeforeCooldown_ReturnsFalse(t *testing.T) {
-	failureThreshold := 3
-	cooldownPeriod := 30 * time.Second
-	baseTime := time.Now()
-
-	cb := NewCircuitBreaker(failureThreshold, cooldownPeriod, func() time.Time { return baseTime })
-
-	// trigger state transitions to Open
-	cb.RecordFailure()
-	cb.RecordFailure()
-	cb.RecordFailure()
-
-	// add time before cooldown period
-	baseTime = baseTime.Add(29 * time.Second)
-
-	assert.Equal(t, false, cb.Allow())
-}
-
-func TestAllow_WhenOpen_AfterCooldown_TransitionToHalfOpen_ReturnTrue(t *testing.T) {
-	failureThreshold := 3
-	cooldownPeriod := 30 * time.Second
-	baseTime := time.Now()
-
-	cb := NewCircuitBreaker(failureThreshold, cooldownPeriod, func() time.Time { return baseTime })
-
-	// trigger state transitions to Open
-	cb.RecordFailure()
-	cb.RecordFailure()
-	cb.RecordFailure()
-
-	// add time before cooldown period
-	baseTime = baseTime.Add(31 * time.Second)
-	// fmt.Println(cb.IsProbeInFlight()) // false
-	assert.Equal(t, true, cb.Allow())
-	assert.Equal(t, HalfOpen, cb.CurrentState())
-}
-
-func TestAllow_ShouldReturnFalse_WhenOpen_AndTimeoutNotExpired(t *testing.T) {
-	baseTime := time.Now()
-	cb := &circuitBreaker{
-		now:            func() time.Time { return baseTime },
-		state:          Open,
-		openedAt:       baseTime,
-		cooldownPeriod: 30 * time.Second,
+func triggerOpen(cb CircuitBreaker) {
+	for range failureThreshold {
+		cb.RecordFailure()
 	}
+}
 
-	baseTime = baseTime.Add(29 * time.Second)
-	assert.Equal(t, false, cb.Allow())
+func TestNewCircuitBreaker(t *testing.T) {
+	t.Run("initial state - is closed", func(t *testing.T) {
+		cb, _ := newTestCB(t)
+		assert.Equal(t, Closed, cb.CurrentState())
+	})
+
+	t.Run("initial failureCount - is 0", func(t *testing.T) {
+		cb, _ := newTestCB(t)
+		assert.Equal(t, 0, cb.GetFailureCount())
+	})
+
+	t.Run("initial probeInFligth - is false", func(t *testing.T) {
+		cb, _ := newTestCB(t)
+		assert.Equal(t, false, cb.IsProbeInFlight())
+	})
+}
+
+func TestAllow(t *testing.T) {
+	t.Run("when state is closed - return true", func(t *testing.T) {
+		cb, _ := newTestCB(t)
+
+		assert.Equal(t, true, cb.Allow())
+	})
+
+	t.Run("when open before cooldown - return false", func(t *testing.T) {
+		cb, clock := newTestCB(t)
+		triggerOpen(cb)
+
+		clock.now = clock.Now().Add(cooldownPeriod).Add(-1 * time.Second) // ~1s before cooldown
+		assert.Equal(t, false, cb.Allow())
+	})
+
+	t.Run("when open after cooldown - return true and state transition to HalfOpen", func(t *testing.T) {
+		cb, clock := newTestCB(t)
+		triggerOpen(cb)
+
+		clock.now = clock.Now().Add(cooldownPeriod).Add(1 * time.Second)
+		assert.Equal(t, true, cb.Allow())
+		assert.Equal(t, HalfOpen, cb.CurrentState())
+	})
+}
+
+func TestRecordAllow(t *testing.T) {
+	t.Run("when closed and failureCount below threshold - state stays closed", func(t *testing.T){
+		cb, _ := newTestCB(t)
+		
+		for range failureThreshold - 1 {
+			cb.RecordFailure()
+		}
+
+		assert.Equal(t, Closed, cb.CurrentState())
+	})
+
+	t.Run("when closed and reaches failureThreshold - state transitions to Open", func(t *testing.T) {
+		cb, _ := newTestCB(t)
+		triggerOpen(cb)
+
+		assert.Equal(t, Open, cb.CurrentState())
+	})
 }
