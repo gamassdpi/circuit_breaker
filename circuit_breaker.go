@@ -47,36 +47,39 @@ func (cb *circuitBreaker) CurrentState() CircuitBreakerState {
 }
 
 func (cb *circuitBreaker) RecordFailure() {
-	cb.failureCount++
-
-	if cb.CurrentState() == HalfOpen && cb.probeInFlight {
-		cb.SetCurrentState(Open)
+	switch cb.state {
+	case Closed:
+		cb.failureCount++
+		if cb.failureCount >= cb.failureThreshold {
+			cb.state = Open
+			cb.openedAt = cb.now()
+		}
+	case HalfOpen:
+		cb.state = Open
 		cb.openedAt = cb.now()
+		cb.probeInFlight = false
 	}
 }
 
 func (cb *circuitBreaker) RecordSuccess() {
 	// if there's 1 request success while HalfOpen, set state to Closed and failureCount to 0
-	if cb.CurrentState() == HalfOpen {
-		cb.SetCurrentState(Closed)
+	if cb.state == HalfOpen {
+		cb.state = Closed
 		cb.probeInFlight = false
 		cb.failureCount = 0
 	}
 }
 
-func (cb *circuitBreaker) SetCurrentState(state CircuitBreakerState) {
-	cb.state = state
-}
-
 func (cb *circuitBreaker) Allow() bool {
-	switch cb.CurrentState() {
+	switch cb.state {
 	case Closed:
 		return true
 	case Open:
 		if cb.now().Sub(cb.openedAt) < cb.cooldownPeriod {
 			return false
 		}
-		cb.SetCurrentState(HalfOpen)
+
+		cb.state = HalfOpen
 		return true
 	case HalfOpen:
 		if cb.probeInFlight {
@@ -87,7 +90,7 @@ func (cb *circuitBreaker) Allow() bool {
 		cb.probeInFlight = true
 		return true
 	default:
-		log.Printf("unknown circuit breaker state: %v", cb.CurrentState())
+		log.Printf("unknown circuit breaker state: %v", cb.state)
 		return true
 	}
 }
