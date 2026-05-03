@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCircuitBreaker(t *testing.T) {
+func TestNewCircuitBreaker_InitialState(t *testing.T) {
 	failureThreshold := 3
 	cooldownPeriod := 30 * time.Second
 	baseTime := time.Now
@@ -17,6 +17,30 @@ func TestNewCircuitBreaker(t *testing.T) {
 	assert.Equal(t, Closed, cb.CurrentState())
 	assert.Equal(t, 0, cb.GetFailureCount())
 	assert.Equal(t, false, cb.IsProbeInFlight())
+}
+
+func TestAllow_WhenClosed_ReturnsTrue(t *testing.T) {
+	failureThreshold := 3
+	cooldownPeriod := 30 * time.Second
+	baseTime := time.Now
+
+	cb := NewCircuitBreaker(failureThreshold, cooldownPeriod, baseTime)
+
+	assert.Equal(t, true, cb.Allow())
+}
+
+func TestRecordFailure_BelowThreshold_StaysClosed(t *testing.T) {
+	failureThreshold := 3
+	cooldownPeriod := 30 * time.Second
+	baseTime := time.Now
+
+	cb := NewCircuitBreaker(failureThreshold, cooldownPeriod, baseTime)
+
+	cb.RecordFailure()
+	cb.RecordFailure()
+
+	assert.Equal(t, 2, cb.GetFailureCount())
+	assert.Equal(t, Closed, cb.CurrentState())
 }
 
 func TestAllow_ShouldReturnFalse_WhenOpen_AndTimeoutNotExpired(t *testing.T) {
